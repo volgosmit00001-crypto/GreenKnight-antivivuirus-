@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenKnight 2026 — Offline Security Engine</title>
+    <title>GreenKnight 2026 — Запрос разрешений</title>
     <style>
         body {
             margin: 0; font-family: Arial, sans-serif;
@@ -14,13 +14,13 @@
         .app {
             background: #181818; border: 2px solid #00E676;
             border-radius: 14px; padding: 20px; width: 100%; max-width: 440px;
-            box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
+            box-shadow: 0 0 25px rgba(0, 230, 118, 0.25); position: relative;
         }
         h1 { color: #00E676; margin: 0; font-size: 22px; text-align: center; }
         .sub { color: #888888; font-size: 12px; text-align: center; margin: 4px 0 14px; }
         .status-box {
             background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
-            padding: 14px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 12px;
+            padding: 14px; text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 12px;
         }
         .bar-bg { background: #262626; height: 10px; border-radius: 6px; overflow: hidden; margin: 8px 0 14px; }
         .bar-fill { background: #00C853; height: 100%; width: 0%; transition: width 0.2s; }
@@ -30,7 +30,7 @@
         }
         .log {
             background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
-            padding: 10px; height: 140px; overflow-y: auto; font-family: monospace;
+            padding: 10px; height: 130px; overflow-y: auto; font-family: monospace;
             font-size: 12px; color: #FF5252; margin: 12px 0;
         }
         .actions { display: flex; gap: 8px; }
@@ -42,6 +42,22 @@
         .btn-quar { background: #FF9100; color: #000; }
         .btn-rest { background: #2979FF; color: #FFF; margin-top: 8px; width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         button:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        /* Модальное окно запроса разрешения */
+        .modal-bg {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8); justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal {
+            background: #222; border: 2px solid #00E676; border-radius: 14px;
+            padding: 20px; width: 85%; max-width: 340px; text-align: center;
+        }
+        .modal h3 { margin: 0 0 10px; color: #00E676; font-size: 18px; }
+        .modal p { font-size: 13px; color: #DDD; line-height: 1.4; margin-bottom: 18px; }
+        .modal-btns { display: flex; gap: 10px; }
+        .modal-btns button { flex: 1; padding: 11px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-allow { background: #00C853; color: #000; }
+        .btn-deny { background: #444; color: #FFF; }
     </style>
 </head>
 <body oncontextmenu="return false;">
@@ -49,14 +65,14 @@
         <h1>GREENKNIGHT 2026</h1>
         <div class="sub">Offline Security Engine • by @kospersky8</div>
 
-        <div class="status-box" id="status">Готов к проверке</div>
+        <div class="status-box" id="status">Требуется разрешение на доступ к файлам</div>
         <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
         <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
 
         <input type="file" id="fileInput" multiple style="display:none" onchange="scanFiles(this.files)">
-        <button class="btn-main" onclick="document.getElementById('fileInput').click()">ВЫБРАТЬ ФАЙЛЫ ДЛЯ СКАНИРОВАНИЯ</button>
+        <button class="btn-main" onclick="askPermission()">СКАНИРОВАТЬ УСТРОЙСТВО</button>
 
-        <div class="log" id="log" style="color:#AAA;">Выберите файлы на устройстве для реальной проверки SHA-256 и EICAR...</div>
+        <div class="log" id="log" style="color:#AAA;">[Система] Доступ к файлам пока не выдан. Нажмите «Сканировать устройство».</div>
 
         <div class="actions">
             <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Удалить из списка</button>
@@ -65,13 +81,78 @@
         <button class="btn-rest" id="restBtn" onclick="restoreQuarantine()" disabled>Открыть карантин / Восстановить (0)</button>
     </div>
 
+    <!-- Всплывающее окно запроса разрешения -->
+    <div class="modal-bg" id="permModal">
+        <div class="modal">
+            <h3>🛡️ Запрос разрешения</h3>
+            <p>Разрешить приложению <b>GreenKnight 2026</b> доступ к хранилищу и проверке файлов на этом устройстве?</p>
+            <div class="modal-btns">
+                <button class="btn-deny" onclick="denyAccess()">Запретить</button>
+                <button class="btn-allow" onclick="grantAccess()">Разрешить</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const EICAR_SIG = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!";
         const MALWARE_HASH = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
         const XOR_KEY = 0x5A;
 
+        let hasPermission = false;
         let threats = [];
         let quarantine = [];
+
+        // При загрузке страницы сразу спрашиваем разрешение
+        window.onload = () => {
+            setTimeout(() => {
+                document.getElementById("permModal").style.display = "flex";
+            }, 400);
+        };
+
+        function askPermission() {
+            if (!hasPermission) {
+                document.getElementById("permModal").style.display = "flex";
+            } else {
+                openPicker();
+            }
+        }
+
+        function denyAccess() {
+            hasPermission = false;
+            document.getElementById("permModal").style.display = "none";
+            document.getElementById("status").innerText = "Доступ запрещён пользователем!";
+            document.getElementById("status").style.color = "#FF5252";
+            document.getElementById("log").style.color = "#FF5252";
+            document.getElementById("log").innerHTML = "[Ошибка] Без разрешения на файлы сканирование невозможно.";
+        }
+
+        async function grantAccess() {
+            hasPermission = true;
+            document.getElementById("permModal").style.display = "none";
+            document.getElementById("status").innerText = "Разрешение получено! Выберите файлы...";
+            document.getElementById("status").style.color = "#00E676";
+
+            // Запрашиваем у браузера разрешение на постоянное хранилище карантина
+            if (navigator.storage && navigator.storage.persist) {
+                await navigator.storage.persist();
+            }
+            openPicker();
+        }
+
+        async function openPicker() {
+            if (window.showDirectoryPicker) {
+                try {
+                    const dirHandle = await window.showDirectoryPicker();
+                    const files = [];
+                    for await (const entry of dirHandle.values()) {
+                        if (entry.kind === "file") files.push(await entry.getFile());
+                    }
+                    scanFiles(files);
+                    return;
+                } catch (e) {}
+            }
+            document.getElementById("fileInput").click();
+        }
 
         async function getSha256(buffer) {
             const hashBuf = await crypto.subtle.digest("SHA-256", buffer);
@@ -79,7 +160,7 @@
         }
 
         async function scanFiles(fileList) {
-            if (!fileList.length) return;
+            if (!fileList || !fileList.length) return;
             threats = [];
             const log = document.getElementById("log");
             const status = document.getElementById("status");
@@ -107,7 +188,7 @@
                 if (hash === MALWARE_HASH || textHead.includes(EICAR_SIG)) {
                     reason = "EICAR-Test-Signature";
                 } else if (nameLow.endsWith(".exe") || nameLow.endsWith(".bat") || nameLow.endsWith(".cmd")) {
-                    reason = "Потенциально опасный исполняемый файл";
+                    reason = "Опасный исполняемый файл";
                 }
 
                 if (reason) {
@@ -120,12 +201,13 @@
                 status.innerHTML = "Угрозы: 0<br>Вы в безопасности!";
                 status.style.color = "#00E676";
                 log.style.color = "#00E676";
-                log.innerHTML = `[OK] Проверено файлов: ${total}. Вредоносного кода не найдено.`;
+                log.innerHTML = `[OK] Проверено файлов: ${total}. Угроз не обнаружено.`;
                 document.getElementById("delBtn").disabled = true;
                 document.getElementById("quarBtn").disabled = true;
             } else {
                 status.innerHTML = `Угроза: ${threats.length}<br>Найдены угрозы!`;
                 status.style.color = "#FF5252";
+                document.getElementById("delBtn").disabled = false;
                 document.getElementById("delBtn").disabled = false;
                 document.getElementById("quarBtn").disabled = false;
             }
@@ -133,7 +215,7 @@
 
         function clearThreats() {
             threats = [];
-            document.getElementById("log").innerHTML = "Угрозы очищены из отчёта.";
+            document.getElementById("log").innerHTML = "Список угроз очищен.";
             document.getElementById("status").innerHTML = "Угрозы: 0<br>Вы в безопасности!";
             document.getElementById("status").style.color = "#00E676";
             document.getElementById("delBtn").disabled = true;
@@ -147,7 +229,7 @@
             });
             threats = [];
             document.getElementById("log").style.color = "#FF9100";
-            document.getElementById("log").innerHTML = "Файлы зашифрованы ключом XOR (0x5A) и перемещены в карантин!";
+            document.getElementById("log").innerHTML = "Файлы зашифрованы ключом XOR (0x5A) и помещены в карантин!";
             document.getElementById("status").innerHTML = "Угрозы изолированы в карантин!";
             document.getElementById("status").style.color = "#00E676";
             document.getElementById("delBtn").disabled = true;
@@ -171,7 +253,7 @@
             rBtn.innerText = `Открыть карантин / Восстановить (${quarantine.length})`;
             if (!quarantine.length) rBtn.disabled = true;
             document.getElementById("log").style.color = "#2979FF";
-            document.getElementById("log").innerHTML = `Файл ${item.name} расшифрован и восстановлен!`;
+            document.getElementById("log").innerHTML = `Файл ${item.name} расшифрован и скачан обратно!`;
         }
     </script>
 </body>
