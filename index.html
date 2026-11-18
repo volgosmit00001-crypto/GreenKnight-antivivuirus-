@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenKnight 2026 — Запрос разрешений</title>
+    <title>GreenKnight 2026 — Глубокое сканирование</title>
     <style>
         body {
             margin: 0; font-family: Arial, sans-serif;
@@ -23,14 +23,19 @@
             padding: 14px; text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 12px;
         }
         .bar-bg { background: #262626; height: 10px; border-radius: 6px; overflow: hidden; margin: 8px 0 14px; }
-        .bar-fill { background: #00C853; height: 100%; width: 0%; transition: width 0.2s; }
+        .bar-fill { background: #00C853; height: 100%; width: 0%; transition: width 0.15s; }
         .btn-main {
             width: 100%; padding: 13px; border: none; border-radius: 8px;
             background: #00C853; color: #000; font-weight: bold; font-size: 14px; cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .btn-sub {
+            width: 100%; padding: 11px; border: 1px solid #00E676; border-radius: 8px;
+            background: #1E1E1E; color: #00E676; font-weight: bold; font-size: 13px; cursor: pointer;
         }
         .log {
             background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
-            padding: 10px; height: 130px; overflow-y: auto; font-family: monospace;
+            padding: 10px; height: 135px; overflow-y: auto; font-family: monospace;
             font-size: 12px; color: #FF5252; margin: 12px 0;
         }
         .actions { display: flex; gap: 8px; }
@@ -43,10 +48,9 @@
         .btn-rest { background: #2979FF; color: #FFF; margin-top: 8px; width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         button:disabled { opacity: 0.35; cursor: not-allowed; }
 
-        /* Модальное окно запроса разрешения */
         .modal-bg {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8); justify-content: center; align-items: center; z-index: 100;
+            background: rgba(0, 0, 0, 0.85); justify-content: center; align-items: center; z-index: 100;
         }
         .modal {
             background: #222; border: 2px solid #00E676; border-radius: 14px;
@@ -63,16 +67,19 @@
 <body oncontextmenu="return false;">
     <div class="app">
         <h1>GREENKNIGHT 2026</h1>
-        <div class="sub">Offline Security Engine • by @kospersky8</div>
+        <div class="sub">Deep Recursive Scanner • by @kospersky8</div>
 
-        <div class="status-box" id="status">Требуется разрешение на доступ к файлам</div>
+        <div class="status-box" id="status">Требуется разрешение на проверку</div>
         <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
         <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
 
+        <input type="file" id="dirInput" webkitdirectory directory multiple style="display:none" onchange="scanFiles(this.files)">
         <input type="file" id="fileInput" multiple style="display:none" onchange="scanFiles(this.files)">
-        <button class="btn-main" onclick="askPermission()">СКАНИРОВАТЬ УСТРОЙСТВО</button>
 
-        <div class="log" id="log" style="color:#AAA;">[Система] Доступ к файлам пока не выдан. Нажмите «Сканировать устройство».</div>
+        <button class="btn-main" onclick="askPermission('dir')">ПРОВЕРИТЬ ВСЮ ПАПКУ (ГЛУБОКИЙ ПОИСК)</button>
+        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ ОТДЕЛЬНЫЕ ФАЙЛЫ</button>
+
+        <div class="log" id="log" style="color:#AAA;">[Система] Выберите папку или выделите все файлы для полного сканирования...</div>
 
         <div class="actions">
             <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Удалить из списка</button>
@@ -81,39 +88,39 @@
         <button class="btn-rest" id="restBtn" onclick="restoreQuarantine()" disabled>Открыть карантин / Восстановить (0)</button>
     </div>
 
-    <!-- Всплывающее окно запроса разрешения -->
     <div class="modal-bg" id="permModal">
         <div class="modal">
-            <h3>🛡️ Запрос разрешения</h3>
-            <p>Разрешить приложению <b>GreenKnight 2026</b> доступ к хранилищу и проверке файлов на этом устройстве?</p>
+            <h3>🛡️ Доступ к файловой системе</h3>
+            <p>Разрешить <b>GreenKnight 2026</b> просканировать все выбранные папки и вложенные файлы на наличие угроз?</p>
             <div class="modal-btns">
                 <button class="btn-deny" onclick="denyAccess()">Запретить</button>
                 <button class="btn-allow" onclick="grantAccess()">Разрешить</button>
             </div>
         </div>
     </div>
-
     <script>
         const EICAR_SIG = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!";
         const MALWARE_HASH = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
+        const TARGET_EXT = [".apk", ".zip", ".exe", ".bat", ".sh", ".py", ".txt", ".cmd", ".scr"];
         const XOR_KEY = 0x5A;
 
         let hasPermission = false;
+        let scanMode = "dir";
         let threats = [];
         let quarantine = [];
 
-        // При загрузке страницы сразу спрашиваем разрешение
         window.onload = () => {
             setTimeout(() => {
                 document.getElementById("permModal").style.display = "flex";
-            }, 400);
+            }, 350);
         };
 
-        function askPermission() {
+        function askPermission(mode) {
+            scanMode = mode;
             if (!hasPermission) {
                 document.getElementById("permModal").style.display = "flex";
             } else {
-                openPicker();
+                startPicker();
             }
         }
 
@@ -122,36 +129,44 @@
             document.getElementById("permModal").style.display = "none";
             document.getElementById("status").innerText = "Доступ запрещён пользователем!";
             document.getElementById("status").style.color = "#FF5252";
-            document.getElementById("log").style.color = "#FF5252";
-            document.getElementById("log").innerHTML = "[Ошибка] Без разрешения на файлы сканирование невозможно.";
         }
 
         async function grantAccess() {
             hasPermission = true;
             document.getElementById("permModal").style.display = "none";
-            document.getElementById("status").innerText = "Разрешение получено! Выберите файлы...";
-            document.getElementById("status").style.color = "#00E676";
-
-            // Запрашиваем у браузера разрешение на постоянное хранилище карантина
             if (navigator.storage && navigator.storage.persist) {
                 await navigator.storage.persist();
             }
-            openPicker();
+            startPicker();
         }
 
-        async function openPicker() {
-            if (window.showDirectoryPicker) {
+        // Рекурсивный обход всех вложенных папок (как os.walk в Python)
+        async function collectAllFiles(dirHandle, fileList) {
+            for await (const entry of dirHandle.values()) {
+                if (entry.kind === "file") {
+                    fileList.push(await entry.getFile());
+                } else if (entry.kind === "directory") {
+                    await collectAllFiles(entry, fileList);
+                }
+            }
+        }
+
+        async function startPicker() {
+            if (scanMode === "dir" && window.showDirectoryPicker) {
                 try {
+                    document.getElementById("status").innerText = "Собираю список всех вложенных файлов...";
                     const dirHandle = await window.showDirectoryPicker();
-                    const files = [];
-                    for await (const entry of dirHandle.values()) {
-                        if (entry.kind === "file") files.push(await entry.getFile());
-                    }
-                    scanFiles(files);
+                    const allFiles = [];
+                    await collectAllFiles(dirHandle, allFiles);
+                    scanFiles(allFiles);
                     return;
                 } catch (e) {}
             }
-            document.getElementById("fileInput").click();
+            if (scanMode === "dir") {
+                document.getElementById("dirInput").click();
+            } else {
+                document.getElementById("fileInput").click();
+            }
         }
 
         async function getSha256(buffer) {
@@ -169,20 +184,26 @@
 
             log.innerHTML = "";
             log.style.color = "#FF5252";
-            status.innerText = "Проверяю файлы...";
+            status.innerText = "Глубокое сканирование...";
             status.style.color = "#FFD600";
 
             const total = fileList.length;
+            let checked = 0;
+
             for (let i = 0; i < total; i++) {
                 const file = fileList[i];
                 const pct = Math.round(((i + 1) / total) * 100);
                 bar.style.width = pct + "%";
                 pctText.innerText = `Проверено: ${i + 1}/${total} (${pct}%)`;
 
+                const nameLow = file.name.toLowerCase();
+                const isTarget = TARGET_EXT.some(ext => nameLow.endsWith(ext));
+                if (!isTarget || file.size > 100 * 1024 * 1024) continue;
+
+                checked++;
                 const buf = await file.arrayBuffer();
                 const hash = await getSha256(buf);
                 const textHead = new TextDecoder().decode(buf.slice(0, 4096));
-                const nameLow = file.name.toLowerCase();
 
                 let reason = null;
                 if (hash === MALWARE_HASH || textHead.includes(EICAR_SIG)) {
@@ -192,22 +213,22 @@
                 }
 
                 if (reason) {
+                    const relPath = file.webkitRelativePath || file.name;
                     threats.push({ name: file.name, buffer: new Uint8Array(buf), reason });
-                    log.innerHTML += `<div>Угроза:${threats.length} это ${file.name} (${reason})</div>`;
+                    log.innerHTML += `<div>Угроза:${threats.length} это ${relPath} (${reason})</div>`;
                 }
             }
 
             if (threats.length === 0) {
-                status.innerHTML = "Угрозы: 0<br>Вы в безопасности!";
+                status.innerHTML = `Угрозы: 0<br>Проверено: ${total} файлов. Вы в безопасности!`;
                 status.style.color = "#00E676";
                 log.style.color = "#00E676";
-                log.innerHTML = `[OK] Проверено файлов: ${total}. Угроз не обнаружено.`;
+                log.innerHTML = `[OK] Глубокая проверка завершена (целевых файлов: ${checked}). Угроз нет.`;
                 document.getElementById("delBtn").disabled = true;
                 document.getElementById("quarBtn").disabled = true;
             } else {
                 status.innerHTML = `Угроза: ${threats.length}<br>Найдены угрозы!`;
                 status.style.color = "#FF5252";
-                document.getElementById("delBtn").disabled = false;
                 document.getElementById("delBtn").disabled = false;
                 document.getElementById("quarBtn").disabled = false;
             }
@@ -229,7 +250,7 @@
             });
             threats = [];
             document.getElementById("log").style.color = "#FF9100";
-            document.getElementById("log").innerHTML = "Файлы зашифрованы ключом XOR (0x5A) и помещены в карантин!";
+            document.getElementById("log").innerHTML = "Все угрозы зашифрованы ключом XOR (0x5A) и убраны в карантин!";
             document.getElementById("status").innerHTML = "Угрозы изолированы в карантин!";
             document.getElementById("status").style.color = "#00E676";
             document.getElementById("delBtn").disabled = true;
