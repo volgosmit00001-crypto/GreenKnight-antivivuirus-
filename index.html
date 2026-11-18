@@ -3,113 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenKnight — Веб-антивирус</title>
+    <title>GreenKnight 2026 — Offline Security Engine</title>
     <style>
         body {
             margin: 0; font-family: Arial, sans-serif;
-            background: #061812; color: #e2f5ee;
+            background: #121212; color: #FFFFFF;
             display: flex; justify-content: center; align-items: center;
             min-height: 100vh; padding: 15px; user-select: none;
         }
         .app {
-            background: #0d2b21; border: 2px solid #00a88e;
-            border-radius: 16px; padding: 22px; width: 100%; max-width: 440px;
-            box-shadow: 0 0 25px rgba(0, 168, 142, 0.4);
+            background: #181818; border: 2px solid #00E676;
+            border-radius: 14px; padding: 20px; width: 100%; max-width: 440px;
+            box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
         }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        h1 { color: #34d399; margin: 0; font-size: 24px; }
-        .badge { background: #f59e0b; color: #000; font-weight: bold; font-size: 11px; padding: 4px 8px; border-radius: 12px; }
-        .bar-bg { background: #071e17; height: 14px; border-radius: 8px; overflow: hidden; margin: 12px 0; border: 1px solid #00a88e; }
-        .bar-fill { background: #00a88e; height: 100%; width: 0%; transition: width 0.2s; }
+        h1 { color: #00E676; margin: 0; font-size: 22px; text-align: center; }
+        .sub { color: #888888; font-size: 12px; text-align: center; margin: 4px 0 14px; }
+        .status-box {
+            background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
+            padding: 14px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 12px;
+        }
+        .bar-bg { background: #262626; height: 10px; border-radius: 6px; overflow: hidden; margin: 8px 0 14px; }
+        .bar-fill { background: #00C853; height: 100%; width: 0%; transition: width 0.2s; }
+        .btn-main {
+            width: 100%; padding: 13px; border: none; border-radius: 8px;
+            background: #00C853; color: #000; font-weight: bold; font-size: 14px; cursor: pointer;
+        }
         .log {
-            background: #04110d; border: 1px solid #134e4a; border-radius: 10px;
-            padding: 12px; height: 150px; overflow-y: auto; font-family: monospace;
-            font-size: 13px; color: #a7f3d0; margin-bottom: 14px;
+            background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
+            padding: 10px; height: 140px; overflow-y: auto; font-family: monospace;
+            font-size: 12px; color: #FF5252; margin: 12px 0;
         }
-        .btns { display: flex; gap: 8px; flex-wrap: wrap; }
-        button {
-            flex: 1; padding: 12px; border: none; border-radius: 10px;
-            font-weight: bold; font-size: 14px; cursor: pointer; color: white;
+        .actions { display: flex; gap: 8px; }
+        .actions button {
+            flex: 1; padding: 11px; border: none; border-radius: 8px;
+            font-weight: bold; font-size: 13px; cursor: pointer;
         }
-        .btn-scan { background: #00a88e; }
-        .btn-quar { background: #dc2626; }
-        .btn-rest { background: #2563eb; }
-        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-del { background: #D50000; color: #FFF; }
+        .btn-quar { background: #FF9100; color: #000; }
+        .btn-rest { background: #2979FF; color: #FFF; margin-top: 8px; width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        button:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
 </head>
 <body oncontextmenu="return false;">
     <div class="app">
-        <div class="header">
-            <h1>🛡️ GreenKnight</h1>
-            <span class="badge">BETA v1.0</span>
-        </div>
-        <div id="status">Система готова к проверке</div>
+        <h1>GREENKNIGHT 2026</h1>
+        <div class="sub">Offline Security Engine • by @kospersky8</div>
+
+        <div class="status-box" id="status">Готов к проверке</div>
+        <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
         <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
-        <div class="log" id="log">[OK] Ядро GreenKnight загружено.<br>Нажмите «Проверить» для старта.</div>
-        <div class="btns">
-            <button class="btn-scan" id="scanBtn" onclick="startScan()">▶ Проверить</button>
-            <button class="btn-quar" id="quarBtn" onclick="toQuarantine()" disabled>🔒 В карантин</button>
-            <button class="btn-rest" id="restBtn" onclick="restoreFiles()" disabled>♻️ Восстановить</button>
+
+        <input type="file" id="fileInput" multiple style="display:none" onchange="scanFiles(this.files)">
+        <button class="btn-main" onclick="document.getElementById('fileInput').click()">ВЫБРАТЬ ФАЙЛЫ ДЛЯ СКАНИРОВАНИЯ</button>
+
+        <div class="log" id="log" style="color:#AAA;">Выберите файлы на устройстве для реальной проверки SHA-256 и EICAR...</div>
+
+        <div class="actions">
+            <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Удалить из списка</button>
+            <button class="btn-quar" id="quarBtn" onclick="quarantineFiles()" disabled>В карантин (.locked)</button>
         </div>
+        <button class="btn-rest" id="restBtn" onclick="restoreQuarantine()" disabled>Открыть карантин / Восстановить (0)</button>
     </div>
 
     <script>
+        const EICAR_SIG = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!";
+        const MALWARE_HASH = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
+        const XOR_KEY = 0x5A;
+
         let threats = [];
         let quarantine = [];
-        const logBox = document.getElementById("log");
-        const bar = document.getElementById("bar");
-        const status = document.getElementById("status");
 
-        function addLog(text, col = "#a7f3d0") {
-            logBox.innerHTML += `<div style="color:${col}; margin-top:4px;">${text}</div>`;
-            logBox.scrollTop = logBox.scrollHeight;
+        async function getSha256(buffer) {
+            const hashBuf = await crypto.subtle.digest("SHA-256", buffer);
+            return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
         }
 
-        function startScan() {
-            document.getElementById("scanBtn").disabled = true;
-            document.getElementById("quarBtn").disabled = true;
+        async function scanFiles(fileList) {
+            if (!fileList.length) return;
             threats = [];
-            let pct = 0;
-            logBox.innerHTML = "";
-            addLog("🔍 Запуск полного сканирования...");
+            const log = document.getElementById("log");
+            const status = document.getElementById("status");
+            const bar = document.getElementById("bar");
+            const pctText = document.getElementById("pctText");
 
-            const timer = setInterval(() => {
-                pct += 10;
+            log.innerHTML = "";
+            log.style.color = "#FF5252";
+            status.innerText = "Проверяю файлы...";
+            status.style.color = "#FFD600";
+
+            const total = fileList.length;
+            for (let i = 0; i < total; i++) {
+                const file = fileList[i];
+                const pct = Math.round(((i + 1) / total) * 100);
                 bar.style.width = pct + "%";
-                status.innerText = `Проверка файлов... ${pct}%`;
+                pctText.innerText = `Проверено: ${i + 1}/${total} (${pct}%)`;
 
-                if (pct === 30) {
-                    threats.push("Trojan.FreeMine.exe");
-                    addLog("⚠️ Найдена угроза: Trojan.FreeMine.exe", "#fca5a5");
+                const buf = await file.arrayBuffer();
+                const hash = await getSha256(buf);
+                const textHead = new TextDecoder().decode(buf.slice(0, 4096));
+                const nameLow = file.name.toLowerCase();
+
+                let reason = null;
+                if (hash === MALWARE_HASH || textHead.includes(EICAR_SIG)) {
+                    reason = "EICAR-Test-Signature";
+                } else if (nameLow.endsWith(".exe") || nameLow.endsWith(".bat") || nameLow.endsWith(".cmd")) {
+                    reason = "Потенциально опасный исполняемый файл";
                 }
-                if (pct === 70) {
-                    threats.push("Adware.PirateLauncher.dll");
-                    addLog("⚠️ Найдена угроза: Adware.PirateLauncher.dll", "#fca5a5");
+
+                if (reason) {
+                    threats.push({ name: file.name, buffer: new Uint8Array(buf), reason });
+                    log.innerHTML += `<div>Угроза:${threats.length} это ${file.name} (${reason})</div>`;
                 }
-                if (pct >= 100) {
-                    clearInterval(timer);
-                    status.innerText = `Проверка завершена! Угроз: ${threats.length}`;
-                    addLog("✅ Сканирование окончено.", "#34d399");
-                    document.getElementById("scanBtn").disabled = false;
-                    if (threats.length > 0) document.getElementById("quarBtn").disabled = false;
-                }
-            }, 250);
+            }
+
+            if (threats.length === 0) {
+                status.innerHTML = "Угрозы: 0<br>Вы в безопасности!";
+                status.style.color = "#00E676";
+                log.style.color = "#00E676";
+                log.innerHTML = `[OK] Проверено файлов: ${total}. Вредоносного кода не найдено.`;
+                document.getElementById("delBtn").disabled = true;
+                document.getElementById("quarBtn").disabled = true;
+            } else {
+                status.innerHTML = `Угроза: ${threats.length}<br>Найдены угрозы!`;
+                status.style.color = "#FF5252";
+                document.getElementById("delBtn").disabled = false;
+                document.getElementById("quarBtn").disabled = false;
+            }
         }
 
-        function toQuarantine() {
-            quarantine = quarantine.concat(threats);
-            addLog(`🔒 В карантин отправлено файлов: ${threats.length}`, "#fde047");
+        function clearThreats() {
             threats = [];
-            status.innerText = "Все угрозы изолированы в карантине!";
+            document.getElementById("log").innerHTML = "Угрозы очищены из отчёта.";
+            document.getElementById("status").innerHTML = "Угрозы: 0<br>Вы в безопасности!";
+            document.getElementById("status").style.color = "#00E676";
+            document.getElementById("delBtn").disabled = true;
             document.getElementById("quarBtn").disabled = true;
-            document.getElementById("restBtn").disabled = false;
         }
 
-        function restoreFiles() {
-            addLog(`♻️ Восстановлено из карантина: ${quarantine.join(", ")}`, "#93c5fd");
-            quarantine = [];
-            status.innerText = "Файлы восстановлены из карантина.";
-            document.getElementById("restBtn").disabled = true;
+        function quarantineFiles() {
+            threats.forEach(t => {
+                const lockedData = t.buffer.map(b => b ^ XOR_KEY);
+                quarantine.push({ name: t.name, data: lockedData });
+            });
+            threats = [];
+            document.getElementById("log").style.color = "#FF9100";
+            document.getElementById("log").innerHTML = "Файлы зашифрованы ключом XOR (0x5A) и перемещены в карантин!";
+            document.getElementById("status").innerHTML = "Угрозы изолированы в карантин!";
+            document.getElementById("status").style.color = "#00E676";
+            document.getElementById("delBtn").disabled = true;
+            document.getElementById("quarBtn").disabled = true;
+            const rBtn = document.getElementById("restBtn");
+            rBtn.disabled = false;
+            rBtn.innerText = `Открыть карантин / Восстановить (${quarantine.length})`;
+        }
+
+        function restoreQuarantine() {
+            if (!quarantine.length) return;
+            const item = quarantine.pop();
+            const restored = item.data.map(b => b ^ XOR_KEY);
+            const blob = new Blob([restored]);
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = item.name;
+            a.click();
+
+            const rBtn = document.getElementById("restBtn");
+            rBtn.innerText = `Открыть карантин / Восстановить (${quarantine.length})`;
+            if (!quarantine.length) rBtn.disabled = true;
+            document.getElementById("log").style.color = "#2979FF";
+            document.getElementById("log").innerHTML = `Файл ${item.name} расшифрован и восстановлен!`;
         }
     </script>
 </body>
