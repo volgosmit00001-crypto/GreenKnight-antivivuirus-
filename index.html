@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenKnight 2026 — Глубокое сканирование</title>
+    <title>GreenKnight 2026 v1.1 — Глубокое сканирование</title>
     <style>
         body {
             margin: 0; font-family: Arial, sans-serif;
@@ -23,7 +23,7 @@
             padding: 14px; text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 12px;
         }
         .bar-bg { background: #262626; height: 10px; border-radius: 6px; overflow: hidden; margin: 8px 0 14px; }
-        .bar-fill { background: #00C853; height: 100%; width: 0%; transition: width 0.15s; }
+        .bar-fill { background: #00C853; height: 100%; width: 0%; transition: width 0.1s; }
         .btn-main {
             width: 100%; padding: 13px; border: none; border-radius: 8px;
             background: #00C853; color: #000; font-weight: bold; font-size: 14px; cursor: pointer;
@@ -35,8 +35,8 @@
         }
         .log {
             background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
-            padding: 10px; height: 135px; overflow-y: auto; font-family: monospace;
-            font-size: 12px; color: #FF5252; margin: 12px 0;
+            padding: 10px; height: 145px; overflow-y: auto; font-family: monospace;
+            font-size: 12px; color: #FF5252; margin: 12px 0; word-break: break-all;
         }
         .actions { display: flex; gap: 8px; }
         .actions button {
@@ -66,20 +66,20 @@
 </head>
 <body oncontextmenu="return false;">
     <div class="app">
-        <h1>GREENKNIGHT 2026</h1>
+        <h1>GREENKNIGHT 2026 <span style="font-size:12px; color:#FFF;">v1.1</span></h1>
         <div class="sub">Deep Recursive Scanner • by @kospersky8</div>
 
         <div class="status-box" id="status">Требуется разрешение на проверку</div>
         <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
         <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
 
-        <input type="file" id="dirInput" webkitdirectory directory multiple style="display:none" onchange="scanFiles(this.files)">
-        <input type="file" id="fileInput" multiple style="display:none" onchange="scanFiles(this.files)">
+        <input type="file" id="dirInput" webkitdirectory directory multiple style="display:none" onchange="handleInputFiles(this.files)">
+        <input type="file" id="fileInput" multiple style="display:none" onchange="handleInputFiles(this.files)">
 
         <button class="btn-main" onclick="askPermission('dir')">ПРОВЕРИТЬ ВСЮ ПАПКУ (ГЛУБОКИЙ ПОИСК)</button>
-        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ ОТДЕЛЬНЫЕ ФАЙЛЫ</button>
+        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ НЕСКОЛЬКО ФАЙЛОВ</button>
 
-        <div class="log" id="log" style="color:#AAA;">[Система] Выберите папку или выделите все файлы для полного сканирования...</div>
+        <div class="log" id="log" style="color:#AAA;">[Система v1.1] Готов к глубокому сканированию всех вложенных файлов...</div>
 
         <div class="actions">
             <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Удалить из списка</button>
@@ -101,7 +101,7 @@
     <script>
         const EICAR_SIG = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!";
         const MALWARE_HASH = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
-        const TARGET_EXT = [".apk", ".zip", ".exe", ".bat", ".sh", ".py", ".txt", ".cmd", ".scr"];
+        const TARGET_EXT = [".apk", ".zip", ".exe", ".bat", ".sh", ".py", ".txt", ".cmd", ".scr", ".vbs", ".ps1"];
         const XOR_KEY = 0x5A;
 
         let hasPermission = false;
@@ -135,33 +135,44 @@
             hasPermission = true;
             document.getElementById("permModal").style.display = "none";
             if (navigator.storage && navigator.storage.persist) {
-                await navigator.storage.persist();
+                try { await navigator.storage.persist(); } catch (e) {}
             }
             startPicker();
         }
 
-        // Рекурсивный обход всех вложенных папок (как os.walk в Python)
-        async function collectAllFiles(dirHandle, fileList) {
+        async function collectAllFiles(dirHandle, fileList, currentPath = "") {
             for await (const entry of dirHandle.values()) {
+                const fullPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
                 if (entry.kind === "file") {
-                    fileList.push(await entry.getFile());
+                    const file = await entry.getFile();
+                    fileList.push({ file, path: fullPath });
                 } else if (entry.kind === "directory") {
-                    await collectAllFiles(entry, fileList);
+                    await collectAllFiles(entry, fileList, fullPath);
                 }
             }
         }
 
         async function startPicker() {
-            if (scanMode === "dir" && window.showDirectoryPicker) {
+            document.getElementById("dirInput").value = "";
+            document.getElementById("fileInput").value = "";
+
+            if (scanMode === "dir" && "showDirectoryPicker" in window) {
                 try {
-                    document.getElementById("status").innerText = "Собираю список всех вложенных файлов...";
+                    document.getElementById("status").innerText = "Открытие проводника папок...";
                     const dirHandle = await window.showDirectoryPicker();
+                    document.getElementById("status").innerText = "Сбор всех вложенных файлов...";
                     const allFiles = [];
-                    await collectAllFiles(dirHandle, allFiles);
+                    await collectAllFiles(dirHandle, allFiles, dirHandle.name);
                     scanFiles(allFiles);
                     return;
-                } catch (e) {}
+                } catch (err) {
+                    if (err.name === "AbortError") {
+                        document.getElementById("status").innerText = "Выбор папки отменён";
+                        return;
+                    }
+                }
             }
+
             if (scanMode === "dir") {
                 document.getElementById("dirInput").click();
             } else {
@@ -169,13 +180,30 @@
             }
         }
 
+        function handleInputFiles(fileList) {
+            if (!fileList || !fileList.length) return;
+            const wrapped = Array.from(fileList).map(f => ({
+                file: f,
+                path: f.webkitRelativePath || f.name
+            }));
+            scanFiles(wrapped);
+        }
+
         async function getSha256(buffer) {
             const hashBuf = await crypto.subtle.digest("SHA-256", buffer);
             return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
         }
 
-        async function scanFiles(fileList) {
-            if (!fileList || !fileList.length) return;
+        function xorBuffer(uint8Arr, key) {
+            const res = new Uint8Array(uint8Arr.length);
+            for (let i = 0; i < uint8Arr.length; i++) {
+                res[i] = uint8Arr[i] ^ key;
+            }
+            return res;
+        }
+
+        async function scanFiles(itemsList) {
+            if (!itemsList || !itemsList.length) return;
             threats = [];
             const log = document.getElementById("log");
             const status = document.getElementById("status");
@@ -187,14 +215,18 @@
             status.innerText = "Глубокое сканирование...";
             status.style.color = "#FFD600";
 
-            const total = fileList.length;
+            const total = itemsList.length;
             let checked = 0;
 
             for (let i = 0; i < total; i++) {
-                const file = fileList[i];
+                const { file, path } = itemsList[i];
                 const pct = Math.round(((i + 1) / total) * 100);
                 bar.style.width = pct + "%";
                 pctText.innerText = `Проверено: ${i + 1}/${total} (${pct}%)`;
+
+                if (i % 15 === 0) {
+                    await new Promise(r => setTimeout(r, 5));
+                }
 
                 const nameLow = file.name.toLowerCase();
                 const isTarget = TARGET_EXT.some(ext => nameLow.endsWith(ext));
@@ -208,14 +240,16 @@
                 let reason = null;
                 if (hash === MALWARE_HASH || textHead.includes(EICAR_SIG)) {
                     reason = "EICAR-Test-Signature";
-                } else if (nameLow.endsWith(".exe") || nameLow.endsWith(".bat") || nameLow.endsWith(".cmd")) {
+                } else if (/\.(jpg|png|pdf|txt|doc|mp3)\.(exe|bat|cmd|vbs|scr|ps1)$/.test(nameLow)) {
+                    reason = "Скрытое двойное расширение!";
+                } else if (nameLow.endsWith(".exe") || nameLow.endsWith(".bat") || nameLow.endsWith(".cmd") || nameLow.endsWith(".vbs")) {
                     reason = "Опасный исполняемый файл";
                 }
 
                 if (reason) {
-                    const relPath = file.webkitRelativePath || file.name;
-                    threats.push({ name: file.name, buffer: new Uint8Array(buf), reason });
-                    log.innerHTML += `<div>Угроза:${threats.length} это ${relPath} (${reason})</div>`;
+                    threats.push({ name: file.name, path, buffer: new Uint8Array(buf), reason });
+                    log.innerHTML += `<div>[!] Угроза #${threats.length}: <b>${path}</b> (${reason})</div>`;
+                    log.scrollTop = log.scrollHeight;
                 }
             }
 
@@ -223,11 +257,11 @@
                 status.innerHTML = `Угрозы: 0<br>Проверено: ${total} файлов. Вы в безопасности!`;
                 status.style.color = "#00E676";
                 log.style.color = "#00E676";
-                log.innerHTML = `[OK] Глубокая проверка завершена (целевых файлов: ${checked}). Угроз нет.`;
+                log.innerHTML = `[OK] Глубокая проверка завершена.<br>Всего файлов: ${total} | Проверено глубоко: ${checked} | Угроз: 0.`;
                 document.getElementById("delBtn").disabled = true;
                 document.getElementById("quarBtn").disabled = true;
             } else {
-                status.innerHTML = `Угроза: ${threats.length}<br>Найдены угрозы!`;
+                status.innerHTML = `Найдено угроз: ${threats.length}<br>Требуется действие!`;
                 status.style.color = "#FF5252";
                 document.getElementById("delBtn").disabled = false;
                 document.getElementById("quarBtn").disabled = false;
@@ -236,6 +270,7 @@
 
         function clearThreats() {
             threats = [];
+            document.getElementById("log").style.color = "#AAA";
             document.getElementById("log").innerHTML = "Список угроз очищен.";
             document.getElementById("status").innerHTML = "Угрозы: 0<br>Вы в безопасности!";
             document.getElementById("status").style.color = "#00E676";
@@ -245,12 +280,13 @@
 
         function quarantineFiles() {
             threats.forEach(t => {
-                const lockedData = t.buffer.map(b => b ^ XOR_KEY);
+                const lockedData = xorBuffer(t.buffer, XOR_KEY);
                 quarantine.push({ name: t.name, data: lockedData });
             });
+            const count = threats.length;
             threats = [];
             document.getElementById("log").style.color = "#FF9100";
-            document.getElementById("log").innerHTML = "Все угрозы зашифрованы ключом XOR (0x5A) и убраны в карантин!";
+            document.getElementById("log").innerHTML = `Зашифровано ключом XOR (0x5A) и помещено в карантин: ${count} шт.`;
             document.getElementById("status").innerHTML = "Угрозы изолированы в карантин!";
             document.getElementById("status").style.color = "#00E676";
             document.getElementById("delBtn").disabled = true;
@@ -263,7 +299,7 @@
         function restoreQuarantine() {
             if (!quarantine.length) return;
             const item = quarantine.pop();
-            const restored = item.data.map(b => b ^ XOR_KEY);
+            const restored = xorBuffer(item.data, XOR_KEY);
             const blob = new Blob([restored]);
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
@@ -274,7 +310,7 @@
             rBtn.innerText = `Открыть карантин / Восстановить (${quarantine.length})`;
             if (!quarantine.length) rBtn.disabled = true;
             document.getElementById("log").style.color = "#2979FF";
-            document.getElementById("log").innerHTML = `Файл ${item.name} расшифрован и скачан обратно!`;
+            document.getElementById("log").innerHTML = `Файл <b>${item.name}</b> расшифрован и скачан обратно!`;
         }
     </script>
 </body>
