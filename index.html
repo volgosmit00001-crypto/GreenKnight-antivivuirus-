@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenKnight 2026 v1.1 — Глубокое сканирование</title>
+    <title>GreenKnight 2026 v2.0 — Глубокое сканирование и проверка APK</title>
+    <script src="https://cloudflare.com"></script>
     <style>
         body {
             margin: 0; font-family: Arial, sans-serif;
@@ -13,11 +14,16 @@
         }
         .app {
             background: #181818; border: 2px solid #00E676;
-            border-radius: 14px; padding: 20px; width: 100%; max-width: 440px;
+            border-radius: 14px; padding: 20px; width: 100%; max-width: 460px;
             box-shadow: 0 0 25px rgba(0, 230, 118, 0.25); position: relative;
         }
         h1 { color: #00E676; margin: 0; font-size: 22px; text-align: center; }
-        .sub { color: #888888; font-size: 12px; text-align: center; margin: 4px 0 14px; }
+        .sub { color: #888888; font-size: 12px; text-align: center; margin: 4px 0 12px; }
+        .badge-safe {
+            background: #132A1E; border: 1px solid #00E676; color: #00E676;
+            font-size: 11px; text-align: center; padding: 5px 8px; border-radius: 6px;
+            margin-bottom: 12px;
+        }
         .status-box {
             background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
             padding: 14px; text-align: center; font-weight: bold; font-size: 15px; margin-bottom: 12px;
@@ -34,20 +40,20 @@
             background: #1E1E1E; color: #00E676; font-weight: bold; font-size: 13px; cursor: pointer;
         }
         .mobile-tip {
-            background: #1B2620;
-            border: 1px dashed #00E676;
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-top: 10px;
-            font-size: 12px;
-            color: #CCC;
-            line-height: 1.45;
+            background: #1B2620; border: 1px dashed #00E676; border-radius: 8px;
+            padding: 10px 12px; margin-top: 10px; font-size: 12px; color: #CCC; line-height: 1.45;
         }
         .mobile-tip b { color: #00E676; }
         .log {
             background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
-            padding: 10px; height: 145px; overflow-y: auto; font-family: monospace;
-            font-size: 12px; color: #FF5252; margin: 12px 0; word-break: break-all;
+            padding: 10px; height: 165px; overflow-y: auto; font-family: monospace;
+            font-size: 12px; color: #FF5252; margin: 12px 0; word-break: break-word;
+            line-height: 1.4;
+        }
+        .log-item { border-bottom: 1px solid #2A2A2A; padding-bottom: 6px; margin-bottom: 6px; }
+        .vt-link {
+            display: inline-block; margin-top: 4px; color: #00E676; text-decoration: none;
+            font-size: 11px; border: 1px solid #00E676; padding: 2px 6px; border-radius: 4px;
         }
         .actions { display: flex; gap: 8px; }
         .actions button {
@@ -56,9 +62,22 @@
         }
         .btn-del { background: #D50000; color: #FFF; }
         .btn-quar { background: #FF9100; color: #000; }
-        .btn-rest { background: #2979FF; color: #FFF; margin-top: 8px; width: 100%; padding: 11px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-rest {
+            background: #2979FF; color: #FFF; margin-top: 8px; width: 100%;
+            padding: 11px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
+        }
         button:disabled { opacity: 0.35; cursor: not-allowed; }
-
+        .info-card {
+            background: #1E1E1E; border: 1px solid #333; border-radius: 8px;
+            padding: 12px; margin-top: 14px; font-size: 12px; color: #CCC; line-height: 1.45;
+        }
+        .info-card h3 { color: #00E676; margin: 0 0 6px; font-size: 14px; }
+        .whats-new {
+            background: #16221B; border-left: 3px solid #00E676;
+            padding: 8px 10px; margin-top: 10px; border-radius: 4px;
+        }
+        .whats-new b { color: #00E676; display: block; margin-bottom: 4px; font-size: 13px; }
+        .disclaimer { font-size: 11px; color: #777; margin-top: 10px; text-align: center; }
         .modal-bg {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.85); justify-content: center; align-items: center; z-index: 100;
@@ -77,10 +96,11 @@
 </head>
 <body oncontextmenu="return false;">
     <div class="app">
-        <h1>GREENKNIGHT 2026 <span style="font-size:12px; color:#FFF;">v1.1</span></h1>
-        <div class="sub">Deep Recursive Scanner • by @kospersky8</div>
+        <h1>GREENKNIGHT 2026 <span style="font-size:12px; color:#FFF;">v2.0</span></h1>
+        <div class="sub">Deep Recursive & APK Inspector • by @kospersky8</div>
+        <div class="badge-safe">🔒 100% Client-Side: файлы проверяются локально и не загружаются в сеть</div>
 
-        <div class="status-box" id="status">Требуется разрешение на проверку</div>
+        <div class="status-box" id="status">Готов к проверке файлов и APK</div>
         <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
         <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
 
@@ -88,34 +108,48 @@
         <input type="file" id="fileInput" multiple style="display:none" onchange="handleInputFiles(this.files)">
 
         <button class="btn-main" onclick="askPermission('dir')">ПРОВЕРИТЬ ВСЮ ПАПКУ (ГЛУБОКИЙ ПОИСК)</button>
-        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ НЕСКОЛЬКО ФАЙЛОВ</button>
+        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ ФАЙЛЫ ИЛИ ПРИЛОЖЕНИЯ (.APK)</button>
 
         <div class="mobile-tip" id="mobileTip">
-            📱 <b>Как проверить все файлы с телефона (Android / Redmi):</b><br>
-            1. Нажмите кнопку выше и откройте меню <b>☰</b> → <b>Загрузки</b> (или папку телефона).<br>
-            2. <b>Зажмите пальцем</b> любой файл на 1–2 секунды.<br>
-            3. Нажмите <b>«Выбрать все»</b> вверху и подтвердите выбор.
+            📱 <b>Как проверить приложения и файлы на Android:</b><br>
+            1. Нажмите кнопку выше → <b>Файлы</b> → <b>Загрузки</b>.<br>
+            2. Выберите нужный файл <b>.apk</b> или зажмите палец и нажмите <b>«Выбрать все»</b>.
         </div>
 
-        <div class="log" id="log" style="color:#AAA;">[Система v1.1] Готов к глубокому сканированию всех вложенных файлов...</div>
+        <div class="log" id="log" style="color:#AAA;">[Система v2.0] Модуль анализа APK, Magic Bytes и SHA-256 активен...</div>
 
         <div class="actions">
-            <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Удалить из списка</button>
+            <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Очистить список</button>
             <button class="btn-quar" id="quarBtn" onclick="quarantineFiles()" disabled>В карантин (.locked)</button>
         </div>
         <button class="btn-rest" id="restBtn" onclick="restoreQuarantine()" disabled>Открыть карантин / Восстановить (0)</button>
+
+        <div class="info-card">
+            <h3>📖 О программе GreenKnight 2026</h3>
+            Браузерный инспектор безопасности для локального анализа папок, документов и установочных файлов Android (<b>.apk</b>). Все вычисления идут прямо в памяти вашего устройства без передачи данных на сервер.
+
+            <div class="whats-new">
+                <b>ЧТО НОВОГО?</b>
+                • можно проверять apk (разбор AndroidManifest, проверка подписи и скрытых файлов внутри)<br>
+                • добавилось описание (подробно о работе сканера и безопасности)<br>
+                • проверка сигнатур Magic Bytes (находит вирусы, замаскированные под фото или документы)<br>
+                • генератор SHA-256 с проверкой файла на VirusTotal в один клик
+            </div>
+        </div>
+        <div class="disclaimer">Учебный и демонстрационный проект по веб-безопасности.</div>
     </div>
 
     <div class="modal-bg" id="permModal">
         <div class="modal">
-            <h3>🛡️ Доступ к файловой системе</h3>
-            <p>Разрешить <b>GreenKnight 2026</b> просканировать все выбранные папки и вложенные файлы на наличие угроз?</p>
+            <h3>🛡️ Локальный доступ к файлам</h3>
+            <p>Выбранные папки и <b>.apk</b> файлы будут прочитаны <b>только в памяти вашего браузера</b> для анализа угроз. Отправка файлов в интернет не производится.</p>
             <div class="modal-btns">
-                <button class="btn-deny" onclick="denyAccess()">Запретить</button>
-                <button class="btn-allow" onclick="grantAccess()">Разрешить</button>
+                <button class="btn-deny" onclick="denyAccess()">Отмена</button>
+                <button class="btn-allow" onclick="grantAccess()">Выбрать файлы</button>
             </div>
         </div>
     </div>
+
     <script>
         const EICAR_SIG = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!";
         const MALWARE_HASH = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
@@ -131,12 +165,6 @@
             document.getElementById("mobileTip").style.display = "none";
         }
 
-        window.onload = () => {
-            setTimeout(() => {
-                document.getElementById("permModal").style.display = "flex";
-            }, 350);
-        };
-
         function askPermission(mode) {
             scanMode = mode;
             if (!hasPermission) {
@@ -149,16 +177,13 @@
         function denyAccess() {
             hasPermission = false;
             document.getElementById("permModal").style.display = "none";
-            document.getElementById("status").innerText = "Доступ запрещён пользователем!";
-            document.getElementById("status").style.color = "#FF5252";
+            document.getElementById("status").innerText = "Выбор файлов отменён";
+            document.getElementById("status").style.color = "#AAA";
         }
 
         async function grantAccess() {
             hasPermission = true;
             document.getElementById("permModal").style.display = "none";
-            if (navigator.storage && navigator.storage.persist) {
-                try { await navigator.storage.persist(); } catch (e) {}
-            }
             startPicker();
         }
 
@@ -210,7 +235,6 @@
             }));
             scanFiles(wrapped);
         }
-
         async function getSha256(buffer) {
             const hashBuf = await crypto.subtle.digest("SHA-256", buffer);
             return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
@@ -222,6 +246,70 @@
                 res[i] = uint8Arr[i] ^ key;
             }
             return res;
+        }
+
+        function checkMagicBytes(uint8Arr, nameLow) {
+            if (uint8Arr.length < 4) return null;
+            if (uint8Arr === 0x4D && uint8Arr === 0x5A) {
+                if (!nameLow.endsWith(".exe") && !nameLow.endsWith(".dll") && !nameLow.endsWith(".scr")) {
+                    return "Подмена формата! Внутри исполняемый файл Windows (MZ)";
+                }
+            }
+            if (uint8Arr === 0x50 && uint8Arr === 0x4B && uint8Arr === 0x03 && uint8Arr === 0x04) {
+                if (/\.(jpg|jpeg|png|gif|mp3|mp4|pdf|txt)$/.test(nameLow)) {
+                    return "Скрытый архив или APK под видом медиа/документа!";
+                }
+            }
+            return null;
+        }
+
+        async function inspectApk(buffer) {
+            if (typeof JSZip === "undefined") {
+                return "APK-пакет (библиотека распаковки не загружена)";
+            }
+            try {
+                const zip = await JSZip.loadAsync(buffer);
+                const files = Object.keys(zip.files);
+                const warnings = [];
+
+                if (!files.includes("AndroidManifest.xml")) {
+                    return "Поврежденный или поддельный APK (нет AndroidManifest.xml)";
+                }
+
+                const hasCert = files.some(f => f.startsWith("META-INF/") && /\.(RSA|DSA|EC)$/i.test(f));
+                if (!hasCert) {
+                    warnings.push("Нет цифровой подписи (модифицированный APK)");
+                }
+
+                const hiddenPayloads = files.filter(f =>
+                    (f.startsWith("assets/") || f.startsWith("res/")) &&
+                    /\.(apk|dex|exe|sh|jar)$/i.test(f)
+                );
+                if (hiddenPayloads.length > 0) {
+                    warnings.push(`Скрытые файлы внутри: ${hiddenPayloads.slice(0, 2).join(", ")}`);
+                }
+
+                const manifestBuf = await zip.file("AndroidManifest.xml").async("uint8array");
+                const manifestText = new TextDecoder("utf-8", { fatal: false }).decode(manifestBuf).replace(/\0/g, "");
+
+                const dangerPerms = [
+                    { key: "READ_SMS", label: "чтение СМС" },
+                    { key: "SEND_SMS", label: "отправка СМС" },
+                    { key: "BIND_DEVICE_ADMIN", label: "права администратора" },
+                    { key: "BIND_ACCESSIBILITY_SERVICE", label: "перехват экрана" },
+                    { key: "REQUEST_INSTALL_PACKAGES", label: "скрытая установка APK" },
+                    { key: "SYSTEM_ALERT_WINDOW", label: "окна поверх приложений" }
+                ];
+
+                const foundPerms = dangerPerms.filter(p => manifestText.includes(p.key)).map(p => p.label);
+                if (foundPerms.length > 0) {
+                    warnings.push(`Опасные права: ${foundPerms.join(", ")}`);
+                }
+
+                return warnings.length > 0 ? `APK-анализ: ${warnings.join(" | ")}` : null;
+            } catch (e) {
+                return "Ошибка распаковки APK (архив поврежден)";
+            }
         }
 
         async function scanFiles(itemsList) {
@@ -239,6 +327,7 @@
 
             const total = itemsList.length;
             let checked = 0;
+            let apkChecked = 0;
 
             for (let i = 0; i < total; i++) {
                 const { file, path } = itemsList[i];
@@ -246,54 +335,80 @@
                 bar.style.width = pct + "%";
                 pctText.innerText = `Проверено: ${i + 1}/${total} (${pct}%)`;
 
-                if (i % 15 === 0) {
-                    await new Promise(r => setTimeout(r, 5));
-                }
+                if (i % 10 === 0) await new Promise(r => setTimeout(r, 5));
+                if (file.size === 0 || file.size > 150 * 1024 * 1024) continue;
 
                 const nameLow = file.name.toLowerCase();
                 const isTarget = TARGET_EXT.some(ext => nameLow.endsWith(ext));
-                if (!isTarget || file.size > 100 * 1024 * 1024) continue;
+
+                if (!isTarget) {
+                    const headBuf = await file.slice(0, 16).arrayBuffer();
+                    const magicWarning = checkMagicBytes(new Uint8Array(headBuf), nameLow);
+                    if (magicWarning) {
+                        checked++;
+                        const fullBuf = await file.arrayBuffer();
+                        const hash = await getSha256(fullBuf);
+                        addThreat(file.name, path, new Uint8Array(fullBuf), magicWarning, hash, log);
+                    }
+                    continue;
+                }
 
                 checked++;
                 const buf = await file.arrayBuffer();
+                const uint8 = new Uint8Array(buf);
                 const hash = await getSha256(buf);
                 const textHead = new TextDecoder().decode(buf.slice(0, 4096));
 
                 let reason = null;
                 if (hash === MALWARE_HASH || textHead.includes(EICAR_SIG)) {
                     reason = "EICAR-Test-Signature";
-                } else if (/\.(jpg|png|pdf|txt|doc|mp3)\.(exe|bat|cmd|vbs|scr|ps1)$/.test(nameLow)) {
+                } else if (/\.(jpg|png|pdf|txt|doc|mp3)\.(exe|bat|cmd|vbs|scr|ps1|apk)$/.test(nameLow)) {
                     reason = "Скрытое двойное расширение!";
+                } else if (nameLow.endsWith(".apk")) {
+                    apkChecked++;
+                    reason = await inspectApk(buf);
                 } else if (nameLow.endsWith(".exe") || nameLow.endsWith(".bat") || nameLow.endsWith(".cmd") || nameLow.endsWith(".vbs")) {
-                    reason = "Опасный исполняемый файл";
+                    reason = "Потенциально опасный исполняемый файл";
+                } else {
+                    reason = checkMagicBytes(uint8, nameLow);
                 }
 
                 if (reason) {
-                    threats.push({ name: file.name, path, buffer: new Uint8Array(buf), reason });
-                    log.innerHTML += `<div>[!] Угроза #${threats.length}: <b>${path}</b> (${reason})</div>`;
-                    log.scrollTop = log.scrollHeight;
+                    addThreat(file.name, path, uint8, reason, hash, log);
                 }
             }
 
             if (threats.length === 0) {
-                status.innerHTML = `Угрозы: 0<br>Проверено: ${total} файлов. Вы в безопасности!`;
+                status.innerHTML = `Угрозы: 0<br>Проверено: ${total} (APK: ${apkChecked}). Всё чисто!`;
                 status.style.color = "#00E676";
                 log.style.color = "#00E676";
-                log.innerHTML = `[OK] Глубокая проверка завершена.<br>Всего файлов: ${total} | Проверено глубоко: ${checked} | Угроз: 0.`;
+                log.innerHTML = `[OK] Проверка завершена.<br>Всего объектов: ${total} | Глубокий анализ: ${checked} | APK проверено: ${apkChecked} | Угроз: 0.`;
                 document.getElementById("delBtn").disabled = true;
                 document.getElementById("quarBtn").disabled = true;
             } else {
-                status.innerHTML = `Найдено угроз: ${threats.length}<br>Требуется действие!`;
+                status.innerHTML = `Найдено предупреждений: ${threats.length}<br>Проверьте отчёт ниже`;
                 status.style.color = "#FF5252";
                 document.getElementById("delBtn").disabled = false;
                 document.getElementById("quarBtn").disabled = false;
             }
         }
 
+        function addThreat(name, path, buffer, reason, hash, logEl) {
+            threats.push({ name, path, buffer, reason, hash });
+            const vtUrl = `https://virustotal.com{hash}`;
+            logEl.innerHTML += `
+                <div class="log-item">
+                    <div>[!] <b>${path}</b></div>
+                    <div style="color:#FFB74D;">Причина: ${reason}</div>
+                    <a class="vt-link" href="${vtUrl}" target="_blank" rel="noopener">🔍 Проверить SHA-256 на VirusTotal</a>
+                </div>`;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
         function clearThreats() {
             threats = [];
             document.getElementById("log").style.color = "#AAA";
-            document.getElementById("log").innerHTML = "Список угроз очищен.";
+            document.getElementById("log").innerHTML = "Список предупреждений очищен.";
             document.getElementById("status").innerHTML = "Угрозы: 0<br>Вы в безопасности!";
             document.getElementById("status").style.color = "#00E676";
             document.getElementById("delBtn").disabled = true;
@@ -309,7 +424,7 @@
             threats = [];
             document.getElementById("log").style.color = "#FF9100";
             document.getElementById("log").innerHTML = `Зашифровано ключом XOR (0x5A) и помещено в карантин: ${count} шт.`;
-            document.getElementById("status").innerHTML = "Угрозы изолированы в карантин!";
+            document.getElementById("status").innerHTML = "Файлы изолированы в карантин!";
             document.getElementById("status").style.color = "#00E676";
             document.getElementById("delBtn").disabled = true;
             document.getElementById("quarBtn").disabled = true;
