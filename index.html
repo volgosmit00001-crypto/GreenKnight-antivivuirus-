@@ -98,7 +98,30 @@
     <div class="app">
         <h1>GREENKNIGHT 2026 <span id="verBtn" onclick="tapVersion()" style="font-size:12px; color:#FFF; cursor:pointer;">v2.1</span></h1>
         <div class="sub">Deep Recursive & APK Inspector • by @kospersky8</div>
-        <div class="badge-safe">🔒 100% Client-Side: файлы проверяются локально и не загружаются в сеть</div>
+                <div class="status-box" id="status">Готов к проверке файлов и APK</div>
+        <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
+        <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
+
+        <input type="file" id="dirInput" webkitdirectory directory multiple style="display:none" onchange="handleInputFiles(this.files)">
+        <input type="file" id="fileInput" multiple style="display:none" onchange="handleInputFiles(this.files)">
+
+        <button class="btn-main" onclick="askPermission('dir')">ПРОВЕРИТЬ ВСЮ ПАПКУ (ГЛУБОКИЙ ПОИСК)</button>
+        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ ФАЙЛЫ ИЛИ ПРИЛОЖЕНИЯ (.APK)</button>
+
+        <div class="mobile-tip" id="mobileTip">
+            📱 <b>Как проверить приложения и файлы на Android:</b><br>
+            1. Нажмите кнопку выше → <b>Файлы</b> → <b>Загрузки</b>.<br>
+            2. Выберите нужный файл <b>.apk</b> или зажмите палец и нажмите <b>«Выбрать все»</b>.
+        </div>
+
+        <div class="log" id="log" style="color:#AAA;">[Система v2.1] Модуль анализа APK, Magic Bytes и SHA-256 активен...</div>
+
+        <div class="actions">
+            <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Очистить список</button>
+            <button class="btn-quar" id="quarBtn" onclick="quarantineFiles()" disabled>В карантин (.locked)</button>
+        </div>
+        <button class="btn-rest" id="restBtn" onclick="restoreQuarantine()" disabled>Открыть карантин / Восстановить (0)</button>
+v class="badge-safe">🔒 100% Client-Side: файлы проверяются локально и не загружаются в сеть</div>
         <div class="info-card">
             <h3>📖 О программе GreenKnight 2026</h3>
             Браузерный инспектор безопасности для локального анализа файлов и APK-пакетов без отправки данных на сервер.
