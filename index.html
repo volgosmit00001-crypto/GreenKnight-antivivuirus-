@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenKnight 2026 v2.0 — Глубокое сканирование и проверка APK</title>
+    <title>GreenKnight 2026 v2.1 — Глубокое сканирование и проверка APK</title>
     <script src="https://cloudflare.com"></script>
     <style>
         body {
@@ -96,60 +96,40 @@
 </head>
 <body oncontextmenu="return false;">
     <div class="app">
-        <h1>GREENKNIGHT 2026 <span style="font-size:12px; color:#FFF;">v2.0</span></h1>
+        <h1>GREENKNIGHT 2026 <span id="verBtn" onclick="tapVersion()" style="font-size:12px; color:#FFF; cursor:pointer;">v2.1</span></h1>
         <div class="sub">Deep Recursive & APK Inspector • by @kospersky8</div>
         <div class="badge-safe">🔒 100% Client-Side: файлы проверяются локально и не загружаются в сеть</div>
-
-        <div class="status-box" id="status">Готов к проверке файлов и APK</div>
-        <div style="font-size:12px; color:#AAA;" id="pctText">Проверено файлов: 0 (0%)</div>
-        <div class="bar-bg"><div class="bar-fill" id="bar"></div></div>
-
-        <input type="file" id="dirInput" webkitdirectory directory multiple style="display:none" onchange="handleInputFiles(this.files)">
-        <input type="file" id="fileInput" multiple style="display:none" onchange="handleInputFiles(this.files)">
-
-        <button class="btn-main" onclick="askPermission('dir')">ПРОВЕРИТЬ ВСЮ ПАПКУ (ГЛУБОКИЙ ПОИСК)</button>
-        <button class="btn-sub" onclick="askPermission('files')">ВЫБРАТЬ ФАЙЛЫ ИЛИ ПРИЛОЖЕНИЯ (.APK)</button>
-
-        <div class="mobile-tip" id="mobileTip">
-            📱 <b>Как проверить приложения и файлы на Android:</b><br>
-            1. Нажмите кнопку выше → <b>Файлы</b> → <b>Загрузки</b>.<br>
-            2. Выберите нужный файл <b>.apk</b> или зажмите палец и нажмите <b>«Выбрать все»</b>.
-        </div>
-
-        <div class="log" id="log" style="color:#AAA;">[Система v2.0] Модуль анализа APK, Magic Bytes и SHA-256 активен...</div>
-
-        <div class="actions">
-            <button class="btn-del" id="delBtn" onclick="clearThreats()" disabled>Очистить список</button>
-            <button class="btn-quar" id="quarBtn" onclick="quarantineFiles()" disabled>В карантин (.locked)</button>
-        </div>
-        <button class="btn-rest" id="restBtn" onclick="restoreQuarantine()" disabled>Открыть карантин / Восстановить (0)</button>
-
         <div class="info-card">
             <h3>📖 О программе GreenKnight 2026</h3>
-            Браузерный инспектор безопасности для локального анализа папок, документов и установочных файлов Android (<b>.apk</b>). Все вычисления идут прямо в памяти вашего устройства без передачи данных на сервер.
+            Браузерный инспектор безопасности для локального анализа файлов и APK-пакетов без отправки данных на сервер.
 
             <div class="whats-new">
-                <b>ЧТО НОВОГО?</b>
-                • можно проверять apk (разбор AndroidManifest, проверка подписи и скрытых файлов внутри)<br>
-                • добавилось описание (подробно о работе сканера и безопасности)<br>
-                • проверка сигнатур Magic Bytes (находит вирусы, замаскированные под фото или документы)<br>
-                • генератор SHA-256 с проверкой файла на VirusTotal в один клик
+                <b>ЧТО НОВОГО В v2.1?</b>
+                • исправлены баги распаковки, проверки Magic Bytes и работы с VirusTotal<br>
+                • улучшен анализ AndroidManifest и скрытых элементов<br>
+                • генератор SHA-256 и проверка через VirusTotal<br>
+                • версия 2.2 временно не планируется
             </div>
         </div>
-        <div class="disclaimer">Учебный и демонстрационный проект по веб-безопасности.</div>
+        <div class="disclaimer">Учебный проект по веб-безопасности.</div>
     </div>
-
     <div class="modal-bg" id="permModal">
         <div class="modal">
-            <h3>🛡️ Локальный доступ к файлам</h3>
-            <p>Выбранные папки и <b>.apk</b> файлы будут прочитаны <b>только в памяти вашего браузера</b> для анализа угроз. Отправка файлов в интернет не производится.</p>
+            <h3>🛡️ Локальная проверка</h3>
+            <p>Выбранные объекты будут прочитаны <b>только в памяти браузера</b> без отправки в сеть.</p>
             <div class="modal-btns">
                 <button class="btn-deny" onclick="denyAccess()">Отмена</button>
-                <button class="btn-allow" onclick="grantAccess()">Выбрать файлы</button>
+                <button class="btn-allow" onclick="grantAccess()">Выбрать</button>
             </div>
         </div>
     </div>
 
+    <div class="modal-bg" id="eggModal" onclick="this.style.display='none'">
+        <div class="modal" style="max-width:380px;">
+            <img src="decody.jpg" alt="2.2 не выйдет никогда..." style="width:100%; border-radius:8px;">
+            <p style="margin:10px 0 0; font-size:12px; color:#00E676;">[Нажмите в любое место, чтобы закрыть]</p>
+        </div>
+    </div>
     <script>
         const EICAR_SIG = "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!";
         const MALWARE_HASH = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
@@ -160,6 +140,15 @@
         let scanMode = "dir";
         let threats = [];
         let quarantine = [];
+        let verTaps = 0;
+
+        function tapVersion() {
+            verTaps++;
+            if (verTaps >= 3) {
+                document.getElementById("eggModal").style.display = "flex";
+                verTaps = 0;
+            }
+        }
 
         if (!/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)) {
             document.getElementById("mobileTip").style.display = "none";
@@ -250,12 +239,12 @@
 
         function checkMagicBytes(uint8Arr, nameLow) {
             if (uint8Arr.length < 4) return null;
-            if (uint8Arr === 0x4D && uint8Arr === 0x5A) {
+            if (uint8Arr[0] === 0x4D && uint8Arr[1] === 0x5A) {
                 if (!nameLow.endsWith(".exe") && !nameLow.endsWith(".dll") && !nameLow.endsWith(".scr")) {
                     return "Подмена формата! Внутри исполняемый файл Windows (MZ)";
                 }
             }
-            if (uint8Arr === 0x50 && uint8Arr === 0x4B && uint8Arr === 0x03 && uint8Arr === 0x04) {
+            if (uint8Arr[0] === 0x50 && uint8Arr[1] === 0x4B && uint8Arr[2] === 0x03 && uint8Arr[3] === 0x04) {
                 if (/\.(jpg|jpeg|png|gif|mp3|mp4|pdf|txt)$/.test(nameLow)) {
                     return "Скрытый архив или APK под видом медиа/документа!";
                 }
@@ -311,7 +300,6 @@
                 return "Ошибка распаковки APK (архив поврежден)";
             }
         }
-
         async function scanFiles(itemsList) {
             if (!itemsList || !itemsList.length) return;
             threats = [];
